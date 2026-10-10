@@ -57,3 +57,6 @@ est disponible sur http://127.0.0.1:8000/docs.
 - Les modèles entraînés sont stockés dans un fichier unique : un réentraînement écrase le précédent.
 - Sur l'hébergement gratuit, ce fichier disparaît au redémarrage de l'app.
 - Jeu de test de petite taille : les métriques varient de plusieurs points d'un tirage à l'autre.
+## Démo
+
+▶️ [Voir la démo vidéo](https://drive.google.com/file/d/1-fIRDbZiic5FwLjyuLA8GNbX3CnMhUky/view?usp=sharing)
