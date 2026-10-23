@@ -59,3 +59,31 @@ def predict(req: PredictRequest):
         seuil=req.seuil,
         decision="À investiguer" if p >= req.seuil else "Traitement standard",
     )
+
+
+# ======================= Module 6 : API d'interprétation =======================
+from core import SENSITIVE
+from xai_core import explain_instance, SHAP_MODELS
+
+
+class ExplainRequest(BaseModel):
+    modele: str = Field("XGBoost", description="Nom du modèle (voir GET /models)")
+    seuil: float = Field(0.5, ge=0, le=1, description="Seuil de décision")
+    top_k: int = Field(8, ge=1, le=30, description="Nombre de variables renvoyées")
+    variables: dict = Field(..., description="Valeurs des variables explicatives du dossier")
+
+
+@app.post("/explain", summary="Explique la prédiction pour un dossier (SHAP)")
+def explain(req: ExplainRequest):
+    b = get_bundle()
+    if req.modele not in b["models"]:
+        raise HTTPException(404, f"Modèle inconnu : {req.modele}")
+    if req.modele not in SHAP_MODELS:
+        raise HTTPException(400, f"Explication SHAP non disponible pour {req.modele}. "
+                                 f"Modèles expliqués : {', '.join(SHAP_MODELS)}")
+    if "background" not in b:
+        raise HTTPException(503, "Modèles exportés par une ancienne version : relance « Entraîner et comparer » dans l'application.")
+    missing = [f for f in b["features"] if f not in req.variables]
+    if missing:
+        raise HTTPException(422, f"Variables manquantes : {missing}")
+    return explain_instance(b, req.modele, req.variables, req.seuil, req.top_k, SENSITIVE)

@@ -183,7 +183,8 @@ with tab3:
                 bar.progress((i + 1) / len(chosen))
             table = pd.DataFrame(rows).sort_values("PR-AUC", ascending=False).reset_index(drop=True)
             st.session_state["models"] = dict(fitted=fitted, table=table, params=best_params, mode=mode, sig=make_sig(P))
-            joblib.dump({"models": fitted, "features": P["features"]}, "bundle.tmp")
+            joblib.dump({"models": fitted, "features": P["features"], "num": P["num"], "cat": P["cat"],
+                        "background": Xtr.sample(min(200, len(Xtr)), random_state=42)}, "bundle.tmp")
             os.replace("bundle.tmp", "bundle.joblib")
 
     if "models" in st.session_state:
@@ -330,5 +331,29 @@ with tab5:
             m1.metric("Probabilité", f"{out['probabilite_fraude']:.1%}")
             m2.metric("Décision", out["decision"])
             st.progress(min(float(out["probabilite_fraude"]), 1.0))
+        else:
+            st.error(f"Erreur {r.status_code} : {r.json().get('detail', r.text)}")
+
+    st.markdown("---")
+    st.markdown("##### Explication via l'API (`POST /explain`)")
+    top_k = st.slider("Nombre de variables affichées", 3, 12, 8, key="api_topk")
+    if st.button("Expliquer via l'API", key="api_explain"):
+        r = requests.post(f"{api_url}/explain",
+                          json={"modele": modele, "seuil": seuil, "top_k": top_k, "variables": values}, timeout=120)
+        if r.ok:
+            out = r.json()
+            m1, m2 = st.columns(2)
+            m1.metric("Probabilité", f"{out['probabilite_fraude']:.1%}")
+            m2.metric("Décision", out["decision"])
+            ct = pd.DataFrame(out["contributions"])
+            fig = px.bar(ct, x="contribution", y="variable", orientation="h", color="effet",
+                         color_discrete_map={"augmente le risque": "#E07B39", "diminue le risque": "#1F3A5F"},
+                         hover_data=["valeur"], title=f"Contributions SHAP ({out['unite']})")
+            fig.update_yaxes(autorange="reversed")
+            st.plotly_chart(fig, width="stretch")
+            st.dataframe(ct, hide_index=True, width="stretch")
+            st.caption(f"Contrôle d'additivité : valeur de base {out['valeur_de_base']} + somme des contributions "
+                       f"{out['somme_des_contributions']} = sortie du modèle, en {out['unite']}.")
+            st.info(out["phrase"])
         else:
             st.error(f"Erreur {r.status_code} : {r.json().get('detail', r.text)}")
